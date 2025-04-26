@@ -1,3 +1,4 @@
+#Alejandra Elizabeth Penagos Jimenez
 # Proyecto 2: Filtros sobre Imágenes y Clasificación - Fruits 360
 from google.colab import drive 
 drive.mount('/content/drive')
