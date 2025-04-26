@@ -1,0 +1,82 @@
+# Proyecto 2: Filtros sobre Imágenes y Clasificación - Fruits 360
+from google.colab import drive 
+drive.mount('/content/drive')
+
+import os
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+
+img_size = 100  
+batch_size = 32
+
+def sobel_filter(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    sobel = cv2.magnitude(sobelx, sobely)
+    sobel = cv2.normalize(sobel, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    return cv2.cvtColor(sobel, cv2.COLOR_GRAY2RGB)
+
+def preprocess_sobel(img):
+    img = cv2.resize(img, (img_size, img_size))
+    img = sobel_filter(img)
+    return img
+
+train_datagen = ImageDataGenerator(preprocessing_function=preprocess_sobel, validation_split=0.2)
+
+train_generator = train_datagen.flow_from_directory(
+    '/content/drive/MyDrive/Colab Notebooks/fruits-360/Training',
+    target_size=(img_size, img_size),
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='training')
+
+val_generator = train_datagen.flow_from_directory(
+    '/content/drive/MyDrive/Colab Notebooks/fruits-360/Training',
+    target_size=(img_size, img_size),
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='validation')
+
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=(img_size, img_size, 3)),
+    MaxPooling2D(2, 2),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D(2, 2),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(train_generator.num_classes, activation='softmax')
+])
+
+model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+model.summary()
+
+epochs = 10
+history = model.fit(train_generator, validation_data=val_generator, epochs=epochs)
+
+plt.plot(history.history['accuracy'], label='Entrenamiento')
+plt.plot(history.history['val_accuracy'], label='Validación')
+plt.title('Precisión con Filtro Sobel')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+images, labels = next(train_generator)
+
+plt.figure(figsize=(15, 5))
+for i in range(5):
+    plt.subplot(1, 5, i+1)
+    plt.imshow(images[i].astype("uint8"))  # Convertimos a formato visual
+    class_index = np.argmax(labels[i])
+    class_name = list(train_generator.class_indices.keys())[class_index]
+    plt.title(class_name)
+    plt.axis("off")
+plt.suptitle("Imágenes filtradas con Sobel (ejemplo)")
+plt.show()
